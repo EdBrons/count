@@ -1,42 +1,47 @@
 import cv2 as cv
 
 
-def draw_point(frame, label, row, bg=(0, 255, 0)):
-    x_shape, y_shape = frame.shape[1], frame.shape[0]
-    x1 = int(row[0]*x_shape)
-    y1 = int(row[1]*y_shape)
-    x2 = int(row[2]*x_shape)
-    y2 = int(row[3]*y_shape)
-    # classes = self.model.names  # Get the name of label index
-    # label_font = cv.FONT_HERSHEY_SIMPLEX  # Font for the label.
-    # Plot the boxes
-    cx = (x1 + x2) // 2
-    cy = (y1 + y2) // 2
-    cv.circle(frame, (cx, cy), radius=4, color=bg, thickness=-1)
+def show_overlay(text, image):
+    font = cv.FONT_HERSHEY_SIMPLEX
+    cv.rectangle(image, (0, 0), (200, 100), (255, 255, 255), -1)
+    cv.rectangle(image, (0, 0), (200, 100), (0, 0, 0), 2)
+    offset = 0
+    for line in text.split('\n'):
+        cv.putText(
+            image, line, (20, 20 + offset), font, 0.6, (0, 0, 0), 2)
+        offset += 20
 
 
-def draw_box(frame, label, row, bg=(0, 255, 0)):
-    x_shape, y_shape = frame.shape[1], frame.shape[0]
-    x1 = int(row[0]*x_shape)
-    y1 = int(row[1]*y_shape)
-    x2 = int(row[2]*x_shape)
-    y2 = int(row[3]*y_shape)
-    confidence = row[4]
-    # classes = self.model.names  # Get the name of label index
-    label_font = cv.FONT_HERSHEY_SIMPLEX  # Font for the label.
-    # Plot the boxes
-    cv.rectangle(
-        frame,
-        (x1, y1),
-        (x2, y2),
-        bg,
-        2)
-    # Put a label over box.
-    cv.putText(
-        frame,
-        f'{confidence:.2f}',
-        (x1, y1),
-        label_font,
-        0.5,
-        bg,
-        1)
+def show_labels(image, cw, ch, rects, point=True, color=(0, 200, 0), threshold=.8):
+    new_img = image.copy()
+    for row in rects:
+        p = row[-1]
+        if (p < threshold):
+            continue
+        cords = row[:-1]
+        x1 = int(cords[0] * cw)
+        y1 = int(cords[1] * ch)
+        x2 = int(cords[2] * cw)
+        y2 = int(cords[3] * ch)
+        if point:
+            cx = int((x1 + x2) / 2)
+            cy = int((y1 + y2) / 2)
+            cv.circle(new_img, (cx, cy), radius=5,
+                      color=color, thickness=-1)
+        else:
+            cv.rectangle(new_img, (x1, y1), (x2, y2), color, 2)
+    return new_img
+
+
+def lerp(low, high, n):
+    if n < low:
+        return 0
+    elif n > high:
+        return 1
+    else:
+        return (n - low) / (high - low)
+
+
+def lerp_color(c1, c2, x):
+    diff = (c2[0] - c1[0], c2[1] - c1[1], c2[2] - c1[2])
+    return (c1[0] + x * diff[0], c1[1] + x * diff[1], c1[2] + x * diff[2])
