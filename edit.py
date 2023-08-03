@@ -3,13 +3,12 @@ from drawing import show_labels, show_overlay, show_rect
 import numpy as np
 
 # TODO:
-# better way to handle mouse drags [X] changed to double clicks
-# hide selected square after toggling it
-# show preview of new rect
+# better way to handle mouse drags [X]
+# show preview of new rect [X]
 # ability to adjust squares
 #   select rect then click line and drag it to move it
 # move keybinds to a settings area
-# add auto toggle mode
+# add auto toggle mode [X]
 
 
 class Edit:
@@ -26,6 +25,7 @@ class Edit:
         self.start_point = None
 
         self.click_start = None
+        self.mouse_pos = None
 
         self.input_mode = 'select'
 
@@ -98,6 +98,7 @@ class Edit:
 
     def handle_mouse(self, event, x, y, flags, param):
         rects = self.get_collisions(x, y)
+        self.mouse_pos = (x, y)
         if event == cv.EVENT_LBUTTONDBLCLK:
             if self.input_mode == 'select':
                 self.handle_selection_click(event, x, y, flags, param)
@@ -162,6 +163,14 @@ class Edit:
 
             if self.start_point is not None:
                 cv.circle(labels, self.start_point, 2, (200, 0, 0), -1)
+                x1 = min(self.start_point[0], self.mouse_pos[0]) / self.width
+                y1 = min(self.start_point[1], self.mouse_pos[1]) / self.height
+                x2 = max(self.start_point[0], self.mouse_pos[0]) / self.width
+                y2 = max(self.start_point[1], self.mouse_pos[1]) / self.height
+                show_rect(labels, self.width, self.height,
+                          [x1, y1, x2, y2, 1],
+                          color=(0, 0, 200),
+                          point=False)
 
             overlay_str = f'input mode: {self.input_mode}\n' \
                 f'threshold: {self.threshold / 100}%\n' \
