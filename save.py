@@ -3,7 +3,7 @@ import uuid
 import cv2 as cv
 
 
-def save_labels(self, frame, labels):
+def save_labels(self, frame, labels, threshold):
     it = os.path.join(self.outdir, 'images/train')
     lt = os.path.join(self.outdir, 'labels/train')
     base_fn = str(uuid.uuid4()) + '.jpg'
@@ -13,6 +13,9 @@ def save_labels(self, frame, labels):
         os.path.splitext(filename)[0]) + '.txt')
     lines = []
     for label, cord in labels:
+        p = cord[-1]
+        if p < threshold:
+            continue
         x1 = float(cord[0])
         y1 = float(cord[1])
         x2 = float(cord[2])

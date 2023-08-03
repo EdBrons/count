@@ -172,7 +172,7 @@ class Edit:
                         point=self.show_point
                         )
 
-            if self.hover_rect is not None:
+            if self.hover_rect is not None and self.input_mode == 'select':
                 show_rect(labels, self.width, self.height,
                           self.hover_rect,
                           color=(200, 0, 0),
