@@ -69,8 +69,9 @@ class Count:
                 break
             results = self.model(image)
             rects = results.xyxyn[0][:, :-1].numpy()
-            image = show_labels(
-                image, self.capture_width, self.capture_height, rects, threshold=self.threshold)
+            show_labels(
+                image, self.capture_width, self.capture_height,
+                rects, threshold=self.threshold)
             show_overlay(f'threshold: {self.threshold}', image)
             cv.imshow('frame', image)
             self.handle_input()
