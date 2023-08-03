@@ -9,6 +9,8 @@ import numpy as np
 #   select rect then click line and drag it to move it
 # move keybinds to a settings area
 # add auto toggle mode [X]
+# when two circles overlap, invert the overlapping region
+# add mode to hide rectangles that have been selected
 
 
 class Edit:
@@ -18,6 +20,7 @@ class Edit:
         self.height = height
         self.rects = rects
 
+        self.mask = False
         self.threshold = 80
         self.show_point = True
         self.hover_rect = None
@@ -135,6 +138,9 @@ class Edit:
             else:
                 self.hover_rect = None
 
+    def toggle_mask(self):
+        self.mask = not self.mask
+
     def handle_input(self):
         k = cv.waitKey(1)
         if k == -1:
@@ -152,6 +158,8 @@ class Edit:
             self.show_point = not self.show_point
         elif k == ord('m'):
             self.toggle_mode()
+        elif k == ord('p'):
+            self.toggle_mask()
         else:
             print(k)
 
@@ -166,12 +174,22 @@ class Edit:
         self.run = True
         while self.run:
             labels = self.image.copy()
-            show_labels(labels, self.width,
-                        self.height, self.rects,
-                        threshold=(self.threshold / 100),
-                        point=self.show_point
-                        )
 
+            if self.mask:
+                show_labels(labels, self.width,
+                            self.height, self.rects,
+                            threshold=(self.threshold / 100),
+                            point=False,
+                            mask=(0, 128, 255)
+                            )
+            else:
+                show_labels(labels, self.width,
+                            self.height, self.rects,
+                            threshold=(self.threshold / 100),
+                            point=self.show_point
+                            )
+
+            # show rect under mouse
             if self.hover_rect is not None and self.input_mode == 'select':
                 show_rect(labels, self.width, self.height,
                           self.hover_rect,
@@ -179,6 +197,7 @@ class Edit:
                           show_conf=True,
                           point=False)
 
+            # show selected rect
             if self.selected_rect is not None:
                 show_rect(labels, self.width, self.height,
                           self.selected_rect,
@@ -186,6 +205,7 @@ class Edit:
                           show_conf=True,
                           point=False)
 
+            # draw starter point and new rect
             if self.start_point is not None:
                 cv.circle(labels, self.start_point, 2, (200, 0, 0), -1)
                 x1 = min(self.start_point[0], self.mouse_pos[0]) / self.width

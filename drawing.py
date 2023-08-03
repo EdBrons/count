@@ -14,7 +14,7 @@ def show_overlay(text, image):
 
 def show_rect(image, cw, ch, rect,
               point=True, color=(0, 200, 0),
-              show_conf=False):
+              show_conf=False, mask=None):
     cords = rect[:-1]
     p = rect[-1]
     x1 = int(cords[0] * cw)
@@ -27,7 +27,10 @@ def show_rect(image, cw, ch, rect,
         cv.circle(image, (cx, cy), radius=5,
                   color=color, thickness=-1)
     else:
-        cv.rectangle(image, (x1, y1), (x2, y2), color, 2)
+        if mask is not None:
+            cv.rectangle(image, (x1, y1), (x2, y2), mask, -1)
+        else:
+            cv.rectangle(image, (x1, y1), (x2, y2), color, 2)
     if show_conf:
         text = f'{p:.2}%'
         font = cv.FONT_HERSHEY_SIMPLEX
@@ -38,11 +41,11 @@ def show_rect(image, cw, ch, rect,
 
 def show_labels(image, cw, ch, rects,
                 point=True, color=(0, 200, 0),
-                threshold=0.8):
+                threshold=0.8, mask=None):
     for row in rects:
         p = row[-1]
         if p > threshold:
-            show_rect(image, cw, ch, row, point=point, color=color)
+            show_rect(image, cw, ch, row, point=point, color=color, mask=mask)
 
 
 def lerp(low, high, n):
