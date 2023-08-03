@@ -5,7 +5,7 @@ import numpy as np
 # TODO:
 # better way to handle mouse drags [X]
 # show preview of new rect [X]
-# ability to adjust squares
+# ability to adjust squares: complicated
 #   select rect then click line and drag it to move it
 # move keybinds to a settings area
 # add auto toggle mode [X]
@@ -67,6 +67,8 @@ class Edit:
         self.selected_rect = rect
 
     def toggle_prob(self, rect):
+        if rect is None:
+            return
         if rect[-1] < self.threshold / 100:
             rect[-1] = 1
         else:
@@ -96,9 +98,32 @@ class Edit:
             self.rects = np.vstack([self.rects, [x1, y1, x2, y2, 1]])
             self.start_point = None
 
+    def collides_circ(self, p, r, x, y):
+        return abs(p[0] - x) ** 2 + abs(p[1] - y) ** 2 < r ** 2
+
+    def get_points(self, rect):
+        return [
+            (rect[0], rect[1]),
+            (rect[2], rect[1]),
+            (rect[0], rect[3]),
+            (rect[2], rect[3])
+        ]
+
+    def get_corner(self, rect, x, y, eps=1):
+        for index, p in enumerate(self.get_points(rect)):
+            p2 = (p[0] * self.width, p[1] * self.height)
+            if self.collides_circ(p2, eps, x, y):
+                return index
+        else:
+            return -1
+
     def handle_mouse(self, event, x, y, flags, param):
         rects = self.get_collisions(x, y)
         self.mouse_pos = (x, y)
+        # if self.selected_rect is not None and event == cv.EVENT_LBUTTONDOWN:
+        # corner = self.get_corner(self.selected_rect, x, y, eps=5)
+        # if corner != -1:
+        #     print('clicked corner')
         if event == cv.EVENT_LBUTTONDBLCLK:
             if self.input_mode == 'select':
                 self.handle_selection_click(event, x, y, flags, param)
