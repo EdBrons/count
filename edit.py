@@ -1,5 +1,5 @@
 import cv2 as cv
-from drawing import show_labels, show_overlay, show_rect
+from drawing import show_labels, show_overlay, show_label, find_overlaps
 import numpy as np
 
 # TODO:
@@ -9,8 +9,8 @@ import numpy as np
 #   select rect then click line and drag it to move it
 # move keybinds to a settings area
 # add auto toggle mode [X]
-# when two circles overlap, invert the overlapping region
-# add mode to hide rectangles that have been selected
+# when two circles overlap, invert the overlapping region [x]
+# add mode to hide rectangles that have been selected [x]
 
 
 class Edit:
@@ -26,6 +26,7 @@ class Edit:
         self.hover_rect = None
         self.selected_rect = None
         self.start_point = None
+        self.hightlight = True
 
         self.click_start = None
         self.mouse_pos = None
@@ -99,6 +100,10 @@ class Edit:
             x2 = max(self.start_point[0], x) / self.width
             y2 = max(self.start_point[1], y) / self.height
             self.rects = np.vstack([self.rects, [x1, y1, x2, y2, 1]])
+            # add rect
+            new_overlap = find_overlaps(
+                self.image, self.width, self.height, self.rects, self.threshold / 100, new_rects=[len(self.rects) - 1], highlight=self.hightlight)
+            self.overlap = cv.bitwise_and(self.overlap, new_overlap)
             self.start_point = None
 
     def collides_circ(self, p, r, x, y):
@@ -149,8 +154,12 @@ class Edit:
             self.run = False
         elif k == ord('-'):
             self.threshold -= 1
+            self.overlap = find_overlaps(
+                self.image, self.width, self.height, self.rects, self.threshold / 100, highlight=self.hightlight)
         elif k == ord('+'):
             self.threshold += 1
+            self.overlap = find_overlaps(
+                self.image, self.width, self.height, self.rects, self.threshold / 100, highlight=self.hightlight)
         elif k == 27:  # Escape
             self.select_rect(None)
             self.start_point = None
@@ -161,7 +170,8 @@ class Edit:
         elif k == ord('p'):
             self.toggle_mask()
         else:
-            print(k)
+            # print(k)
+            pass
 
     def count(self, threshold):
         n = 0
@@ -172,18 +182,22 @@ class Edit:
 
     def loop(self):
         self.run = True
+
+        self.labels = self.image.copy()
+        self.overlap = find_overlaps(
+            self.labels, self.width, self.height, self.rects, self.threshold / 100, highlight=self.hightlight)
         while self.run:
-            labels = self.image.copy()
+            self.labels = self.image.copy()
 
             if self.mask:
-                show_labels(labels, self.width,
+                show_labels(self.labels, self.width,
                             self.height, self.rects,
                             threshold=(self.threshold / 100),
                             point=False,
-                            mask=(0, 128, 255)
+                            fill=(0, 128, 255)
                             )
             else:
-                show_labels(labels, self.width,
+                show_labels(self.labels, self.width,
                             self.height, self.rects,
                             threshold=(self.threshold / 100),
                             point=self.show_point
@@ -191,40 +205,42 @@ class Edit:
 
             # show rect under mouse
             if self.hover_rect is not None and self.input_mode == 'select':
-                show_rect(labels, self.width, self.height,
-                          self.hover_rect,
-                          color=(200, 0, 0),
-                          show_conf=True,
-                          point=False)
+                show_label(self.labels, self.width, self.height,
+                           self.hover_rect,
+                           color=(200, 0, 0),
+                           show_conf=True,
+                           point=False)
 
             # show selected rect
             if self.selected_rect is not None:
-                show_rect(labels, self.width, self.height,
-                          self.selected_rect,
-                          color=(200, 0, 200),
-                          show_conf=True,
-                          point=False)
+                show_label(self.labels, self.width, self.height,
+                           self.selected_rect,
+                           color=(200, 0, 200),
+                           show_conf=True,
+                           point=False)
 
             # draw starter point and new rect
             if self.start_point is not None:
-                cv.circle(labels, self.start_point, 2, (200, 0, 0), -1)
+                cv.circle(self.labels, self.start_point, 2, (200, 0, 0), -1)
                 x1 = min(self.start_point[0], self.mouse_pos[0]) / self.width
                 y1 = min(self.start_point[1], self.mouse_pos[1]) / self.height
                 x2 = max(self.start_point[0], self.mouse_pos[0]) / self.width
                 y2 = max(self.start_point[1], self.mouse_pos[1]) / self.height
-                show_rect(labels, self.width, self.height,
-                          [x1, y1, x2, y2, 1],
-                          color=(0, 0, 200),
-                          point=False)
+                show_label(self.labels, self.width, self.height,
+                           [x1, y1, x2, y2, 1],
+                           color=(0, 0, 200),
+                           point=False)
 
             overlay_str = f'input mode: {self.input_mode}\n' \
-                f'threshold: {self.threshold / 100}%\n' \
+                f'threshold: {self.threshold / 100:1.2}%\n' \
                 f'count: {self.count(self.threshold)}'
 
             show_overlay(
                 overlay_str,
-                labels
+                self.labels
             )
+
+            labels = cv.bitwise_and(self.labels, self.overlap)
 
             cv.imshow('frame', labels)
             self.handle_input()
