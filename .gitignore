@@ -1,4 +1,6 @@
 .vscode
 venv
-*.pt
 dataset
+
+*.pt
+*.pyc
