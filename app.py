@@ -1,7 +1,6 @@
 import argparse
 import cv2 as cv
 from count import Count
-from drawing import lerp, lerp_color
 
 """
 code start the camera capture

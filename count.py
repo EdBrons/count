@@ -1,7 +1,7 @@
 import torch
 import cv2 as cv
 from edit import Edit
-from drawing import show_labels, show_overlay
+from drawing import yolo_to_pixel, show_labels, show_overlay
 
 
 class Count:
@@ -14,8 +14,26 @@ class Count:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.model.to(device)
         self.load_capture(camera)
-        self.threshold = .8
+
+        self.labeled_image = None
         cv.namedWindow('frame', cv.WINDOW_NORMAL)
+
+        # display options
+
+        self._threshold = 80
+        self.thresh_step = 1
+        self.lerp_conf = False
+        self.show_point = True
+        self.show_highlight = False
+        self.mask_rect = False
+
+        # keymap
+
+        self.key_quit = ord('q')
+        self.key_inc_thresh = ord('+')
+        self.key_dec_thresh = ord('-')
+        self.key_toggle_lerp = ord('l')
+        self.key_edit = 13 # enter
 
     def load_capture(self, camera):
         self.capture = cv.VideoCapture(camera)
@@ -27,38 +45,61 @@ class Count:
         self.capture_width = int(self.capture.get(cv.CAP_PROP_FRAME_WIDTH))
         self.capture_height = int(self.capture.get(cv.CAP_PROP_FRAME_HEIGHT))
 
-    def mask_image(self, image, rects):
-        new_img = image.copy()
-        for row in rects:
-            overlay = new_img.copy()
-            cords = row[:-1]
-            x1 = int(cords[0] * self.capture_width)
-            y1 = int(cords[1] * self.capture_height)
-            x2 = int(cords[2] * self.capture_width)
-            y2 = int(cords[3] * self.capture_height)
-            p = row[-1] / 2
-            cv.rectangle(overlay, (x1, y1), (x2, y2), (0, 200, 0), -1)
-            new_img = cv.addWeighted(overlay, p, new_img, 1 - p, 0)
-        return new_img
+    def inc_threshold(self, val):
+        MIN = 0
+        MAX = 100
+        new_threshold = self._threshold + val
+        if new_threshold < MIN:
+            self._threshold = MIN
+        elif new_threshold > MAX:
+            self._threshold = MAX
+        else:
+            self._threshold = new_threshold
 
-    def edit_image(self):
-        ret, image = self.capture.read()
-        if ret is None or ret is False:
-            self.run = False
-            return
-        results = self.model(image)
-        rects = results.xyxyn[0][:, :-1].numpy()
-        edit = Edit(image, rects, self.capture_width, self.capture_height)
-        edit.loop()
+    def threshold(self):
+        return self._threshold / 100
 
-    def handle_input(self):
-        k = cv.waitKey(1)
+    def toggle_lerp(self):
+        self.lerp_conf = not self.lerp_conf
+
+    def label_image(self, image, labels, saved=False):
+        if not saved:
+            self.labeled_image = image.copy()
+            show_labels(
+                self.labeled_image,
+                labels, 
+                threshold=self.threshold(),
+                lerp=self.lerp_conf)
+            show_overlay(self.overlay_string(), self.labeled_image)
+        else:
+            pass
+            # just draw mouse stuff
+
+
+    def handle_input(self, t=1):
+        k = cv.waitKey(t)
+        changed = False
         if k == -1:
             return
-        elif k == ord('q'):
+        elif k == self.key_quit:
             self.run = False
-        elif k == 13:  # tab
+        elif k == self.key_inc_thresh:
+            self.inc_threshold(self.thresh_step)
+            changed = True
+        elif k == self.key_dec_thresh:
+            self.inc_threshold(-self.thresh_step)
+            changed = True
+        elif k == self.key_toggle_lerp:
+            self.toggle_lerp()
+            changed = True
+        elif k == self.key_edit:
             self.edit_image()
+        return changed
+
+
+    def overlay_string(self):
+        return f'threshold: {self.threshold()} (+/- to change)\n' \
+               f'lerping: {self.lerp_conf}'
 
     def loop(self):
         self.run = True
@@ -68,10 +109,24 @@ class Count:
                 self.run = False
                 break
             results = self.model(image)
-            rects = results.xyxyn[0][:, :-1].numpy()
-            show_labels(
-                image, self.capture_width, self.capture_height,
-                rects, threshold=self.threshold)
-            show_overlay(f'threshold: {self.threshold}', image)
-            cv.imshow('frame', image)
+            rects = yolo_to_pixel(results.xyxyn[0][:, :-1].numpy(), 
+                            self.capture_width, self.capture_height)
+            self.label_image(image, rects)
+            cv.imshow('frame', self.labeled_image)
             self.handle_input()
+    
+    def edit_image(self, image=None):
+        if image is None:
+            ret, image = self.capture.read()
+
+        results = self.model(image)
+        rects = yolo_to_pixel(results.xyxyn[0][:, :-1].numpy(), 
+                        self.capture_width, self.capture_height)
+
+        while self.run:
+            cv.imshow('frame', self.labeled_image)
+            if self.handle_input(t=-1):
+                self.label_image(image, rects)
+                cv.imshow('frame', self.labeled_image)
+        self.run = True
+
